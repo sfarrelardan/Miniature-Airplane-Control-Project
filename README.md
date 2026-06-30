@@ -1,2 +1,22 @@
 # Miniature-Airplane-Control-Project
-This repository contains the code required to control a miniature airplane mounted on a Zybo Z7 board. The goal is to ensure that the airplane stays level regardless the orientation of the board it is mounted on.
+This repository contains the code required to control a miniature airplane mounted on a Zybo Z7 board. The goal is to ensure that the airplane stays level regardless the orientation of the board it is mounted on. The mini airplane is mounted on the board by two servo motors. Each motor controls the horizontal and vertical orientation respectively. Additionally, a PMOD joystick is installed on the Zybo Z7 board. The joystick is used to manually control the airplane's orientation if desired. Lastly, an ADXL362 accelerometer is installed on the board. This is used to read the orientation of the board. The data is then used to compute the required correction to apply by the motors.
+## Zybo Z7 Board
+The board used in this project is a Zybo-Z7 SoC by Digilent. The board is equipped with two main functional blocks: a processing unit, which is a Cortex-A9 MPCore APU clocked at 500MHz; and a programmable logic, which is a Xilinx 7 series FPGA. Furthermore, the board has a UART port to connect with a PC, and a Serial Peripheral Interface (SPI) to manage the communication between the board and an accelerometer or a joystick, among other interfaces. UART is a communication protocol that enables asynchronous serial data transfer between devices by converting parallel data into serial form and vice versa. While SPI is a synchronous communication standard commonly used in embedded systems for data exchange through the serial port.
+
+The board can be programmed in two ways. Directly programming the FPGA with Vivado which allows us to manipulate the gate arrays and create internal programs. However, the program created for the FPGA can only communicate internally. The external communication is handled by user written programs in C. The APU is responsible for running this program because the FPGA itself cannot run them.
+
+## ADXL362 Accelerometer
+The board is connected to an ADXL362 accelerometer that measures the acceleration of the aircraft in three axes: x-, y- and z-axis. This reading process can be done via SPI1 ss0. The SPI drivers are implemented in the platform. with functions including initializing, reading, writing, and converting, in which the writing function is to be completed. The board follows a specific routine to communicate using SPI, as detailed in the Zyqn-7000
+manual on page 541. Specifically, the Master Mode1 with manual SS and auto start will be used.
+
+## PWM IP Module
+To control the servo motor, a new PWM signal generator IP must be programmed on the FPGA. The duty cycle of the servo motor is specified below:
+<img width="1129" height="559" alt="image" src="https://github.com/user-attachments/assets/bc9c52b2-af78-45d0-83aa-e7316fc07dcd" />
+
+To satisfy the specification, a 500kHz rhythm counter was programmed to reduce the original 50MHz clock by a factor of 100 and timed each duty cycle by a PWM counter (0 – 9999). This setup divides the duty cycle of 20ms into 10000 steps, i.e., the operational range (-90° to 90°) of the servo motor is divided into 500 steps (1ms). The relationship between counters and the PWM signal are demonstrated as below:
+<img width="1132" height="438" alt="image" src="https://github.com/user-attachments/assets/03aa8c51-aa51-4866-bf1a-576145f73bee" />
+
+The number of steps needed to move the servo is provided through AXI slave registers: slvreg0 and slvreg1, for x-axis and y-axis respectively. Each of these registers is 32 bits wide and is accessed by the AXI interface between the Processing System (PS) and Programmable Logic (PL). These registers will be written by a C driver to give the correct input to the PWM IP.
+
+After confirming the function of the IP, it can be packaged and included in the block design. When including the IP, it is important to ensure that the required signals are routed correctly to the new IP. In our case, the AXI GP0 interface of the Zynq-7000 FPGA is activated to provide the base clock, which is required by the PWM IP. Once it is done, a prompt appears proposing a wizard to automatically connect all the newly generated interfaces. Clicking on this prompt connects and includes other necessary IPs required to implement the PWM. Finally, the output PWM signals must be mapped to the pins which are connected to the servomotorsʼ control signal wire in the constraint file.
+<img width="1304" height="497" alt="image" src="https://github.com/user-attachments/assets/0c90dd35-560e-47ae-ad50-f126fd3bb297" />
